@@ -2,7 +2,7 @@
 
 A real-time sleep and fatigue analysis dashboard built on polysomnography data from the DREAMT dataset.
 
-> **Data:** Download the participant CSV files from the [DREAMT dataset on PhysioNet](https://physionet.org/content/dreamt/) (DOI: 10.13026/7r9r-7r24) and place them in the root directory alongside the notebook. The CSV files are not included in this repo due to their size (~130 MB each).
+> **Data:** The participant CSV files are not included in this repo due to their size (~130 MB each). To get the data, sign up on [PhysioNet](https://physionet.org) and request access to the [DREAMT dataset](https://physionet.org/content/dreamt/2.1.0/) (DOI: 10.13026/7r9r-7r24). Once approved, download the CSV files and place them in the root directory alongside the notebook.
 
 ---
 
