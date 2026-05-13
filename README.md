@@ -70,6 +70,7 @@ The dashboard opens at `http://localhost:3000`.
 |--------|------|-------------|
 | `GET` | `/participants` | List of participant IDs found in parent directory |
 | `GET` | `/participant/{id}/epochs` | All 30-second epochs for a participant |
+| `GET` | `/participant/{id}/schedule` | Recovery score and shift recommendation for a participant |
 
 ### Epoch fields
 
@@ -100,10 +101,31 @@ score     = clamp(base + hr_bonus + std_bonus + mov_bonus, 0, 100)
 
 ## Dashboard Panels
 
-1. **Summary Cards** — Total Sleep Time · Wake % · REM % · Avg HR · Avg Fatigue Score
+1. **Summary Cards** — Total Sleep Time · Wake % · REM % · Avg HR · Avg Fatigue Score · Recovery Score
 2. **Hypnogram** — Step chart of sleep stages across the night, color-coded per stage
 3. **Fatigue Score** — Raw score (faint) + 5-epoch rolling average (bold); apnea epochs shaded; reference lines at 30 (low) and 60 (high)
 4. **Biosignals** — HR over time (red) and EDA over time (blue)
+5. **Shift Recommendation** — Duty category, max shift length, and critical duty eligibility derived from the recovery score; a 24-hour alertness bar chart with the recommended shift window highlighted; a plain-text scheduling recommendation
+
+### Recovery Score & Scheduling
+
+The `/schedule` endpoint computes a **Recovery Score (0–100)** from the night's epoch data:
+
+```
+avg_sleep_fatigue = mean fatigue_score of non-wake epochs
+wake_penalty      = min(wake_pct × 2, 100)
+rem_penalty       = min(max(0, 20 − rem_pct) × 5, 100)
+weighted_penalty  = 0.40 × avg_sleep_fatigue + 0.35 × wake_penalty + 0.25 × rem_penalty
+recovery_score    = 100 − weighted_penalty
+```
+
+| Recovery Score | Duty Category | Max Shift | Critical Duty |
+|---------------|---------------|-----------|---------------|
+| ≥ 70 | Full Duty | 8 h | Yes |
+| ≥ 40 | Reduced Duty | 6 h | No |
+| < 40 | Rest Recommended | 4 h | No |
+
+Circadian alertness per hour (Borbély two-process model, ~7 am wake time) is scaled by `recovery_score / 100` and the best consecutive shift window is selected from that curve, avoiding overnight starts (00:00–05:00).
 
 ---
 
