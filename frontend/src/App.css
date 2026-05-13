@@ -204,7 +204,7 @@ html, body, #root {
 /* ── Summary cards ─────────────────────────────────────────────────────────── */
 .cards-row {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 12px;
 }
 
@@ -284,6 +284,48 @@ html, body, #root {
   margin-bottom: 6px;
 }
 
+/* ── Duty info row ─────────────────────────────────────────────────────────── */
+.duty-info-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.duty-info-box {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 16px;
+  background: var(--bg-card);
+}
+
+.duty-info-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  letter-spacing: 0.01em;
+}
+
+.duty-info-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+/* ── Recommendation text box ───────────────────────────────────────────────── */
+.rec-text-box {
+  margin-top: 20px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px 18px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  line-height: 1.6;
+}
+
 /* ── Stage legend ──────────────────────────────────────────────────────────── */
 .stage-legend {
   display: flex;
@@ -323,8 +365,10 @@ html, body, #root {
   .header { flex-direction: column; align-items: flex-start; gap: 12px; padding: 16px 20px; }
   .dashboard { padding: 16px 20px; }
   .cards-row { grid-template-columns: repeat(3, 1fr); }
+  .duty-info-row { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 600px) {
   .cards-row { grid-template-columns: repeat(2, 1fr); }
+  .duty-info-row { grid-template-columns: 1fr; }
 }

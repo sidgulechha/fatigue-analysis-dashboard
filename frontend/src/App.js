@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import {
   ComposedChart,
+  Bar,
+  Cell,
   LineChart,
   Line,
   XAxis,
@@ -26,6 +28,27 @@ const STAGE_COLOR = {
   N3: '#1a5276',
   R:  '#8e44ad',
 };
+
+const DUTY_COLORS = { green: '#27ae60', amber: '#f39c12', red: '#e74c3c' };
+
+function alertnessBarColor(v) {
+  if (v >= 70) return '#2ecc71';
+  if (v >= 50) return '#f39c12';
+  return '#e74c3c';
+}
+
+function recoveryScoreColor(score) {
+  if (score >= 70) return '#27ae60';
+  if (score >= 40) return '#f39c12';
+  return '#e74c3c';
+}
+
+function hourLabel(h) {
+  if (h === 0)  return '12am';
+  if (h < 12)   return `${h}am`;
+  if (h === 12) return '12pm';
+  return `${h - 12}pm`;
+}
 
 // Shared chart axis / grid props
 const TICK_STYLE = { fill: '#868e96', fontSize: 11, fontFamily: 'Instrument Sans, system-ui, sans-serif' };
@@ -117,6 +140,20 @@ const SummaryCard = ({ label, value, unit }) => (
   </div>
 );
 
+const RecoveryCard = ({ score, category }) => {
+  const color = recoveryScoreColor(score);
+  return (
+    <div className="summary-card">
+      <div className="card-label">RECOVERY SCORE</div>
+      <div className="card-value" style={{ color }}>
+        {score}
+        <span className="card-unit">/ 100</span>
+      </div>
+      <div style={{ fontSize: 11, color, fontWeight: 500, marginTop: 5 }}>{category}</div>
+    </div>
+  );
+};
+
 // ── Section wrapper ────────────────────────────────────────────────────────────
 const Section = ({ title, badge, children }) => (
   <div className="section">
@@ -135,6 +172,7 @@ export default function App() {
   const [epochs, setEpochs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [schedule, setSchedule] = useState(null);
 
   useEffect(() => {
     axios.get(`${API}/participants`)
@@ -150,9 +188,17 @@ export default function App() {
     setLoading(true);
     setError('');
     setEpochs([]);
+    setSchedule(null);
     axios.get(`${API}/participant/${selected}/epochs`)
       .then((r) => { setEpochs(r.data); setLoading(false); })
       .catch((e) => { setError(`Failed to load data for ${selected}: ${e.message}`); setLoading(false); });
+  }, [selected]);
+
+  useEffect(() => {
+    if (!selected) return;
+    axios.get(`${API}/participant/${selected}/schedule`)
+      .then((r) => setSchedule(r.data))
+      .catch(() => {});
   }, [selected]);
 
   const enriched = useMemo(() => rollingAverage(epochs, 'fatigue_score', 5), [epochs]);
@@ -176,6 +222,14 @@ export default function App() {
     if (start !== null) areas.push({ x1: start, x2: enriched[enriched.length - 1]?.time_hours });
     return areas;
   }, [enriched]);
+
+  const alertnessData = useMemo(() => {
+    if (!schedule) return [];
+    return Array.from({ length: 24 }, (_, h) => ({
+      hour: h,
+      alertness: schedule.alertness_by_hour[String(h)],
+    }));
+  }, [schedule]);
 
   const stats = useMemo(() => {
     if (!epochs.length) return null;
@@ -252,6 +306,7 @@ export default function App() {
             <SummaryCard label="REM"               value={stats.remPct}    unit="%" />
             <SummaryCard label="Mean heart rate"   value={stats.avgHr}     unit="bpm" />
             <SummaryCard label="Mean fatigue score" value={stats.avgFatigue} unit="/ 100" />
+            {schedule && <RecoveryCard score={schedule.recovery_score} category={schedule.duty_category} />}
           </div>
 
           {/* ── Hypnogram ────────────────────────────────────────────────── */}
@@ -434,6 +489,121 @@ export default function App() {
               </LineChart>
             </ResponsiveContainer>
           </Section>
+
+          {/* ── Shift Recommendation ─────────────────────────────────────── */}
+          {schedule && (
+            <Section title="Shift Recommendation">
+
+              {/* Part A — Duty status row */}
+              <div className="duty-info-row">
+                <div className="duty-info-box">
+                  <div className="duty-info-label">Duty Category</div>
+                  <div className="duty-info-value" style={{ color: DUTY_COLORS[schedule.duty_color] }}>
+                    {schedule.duty_category}
+                  </div>
+                </div>
+                <div className="duty-info-box">
+                  <div className="duty-info-label">Max Shift Length</div>
+                  <div className="duty-info-value">{schedule.max_shift_hours} hours</div>
+                </div>
+                <div className="duty-info-box">
+                  <div className="duty-info-label">Critical Duty Eligible</div>
+                  <div
+                    className="duty-info-value"
+                    style={{ color: schedule.critical_duty_eligible ? '#27ae60' : '#e74c3c' }}
+                  >
+                    {schedule.critical_duty_eligible ? 'Yes' : 'No'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Part B — 24-hour alertness timeline */}
+              <div className="signal-label" style={{ marginBottom: 6 }}>24-hour alertness</div>
+              <ResponsiveContainer width="100%" height={200}>
+                <ComposedChart data={alertnessData} margin={{ top: 10, right: 20, left: 0, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 6" stroke={GRID_STROKE} vertical={false} />
+                  <XAxis
+                    dataKey="hour"
+                    interval={0}
+                    tickFormatter={(v) => (Number(v) % 6 === 0 ? hourLabel(Number(v)) : '')}
+                    tick={TICK_STYLE}
+                    axisLine={AXIS_LINE}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    ticks={[0, 25, 50, 75, 100]}
+                    tick={TICK_STYLE}
+                    axisLine={false}
+                    tickLine={false}
+                    width={36}
+                  />
+                  <Tooltip
+                    content={(props) => {
+                      if (!props.active || !props.payload?.length) return null;
+                      const d = props.payload[0].payload;
+                      const inWindow =
+                        d.hour >= schedule.recommended_shift_start &&
+                        d.hour < schedule.recommended_shift_end;
+                      return (
+                        <TooltipBox>
+                          <div style={{ color: '#212529', fontWeight: 600, marginBottom: 3 }}>
+                            {hourLabel(d.hour)}
+                          </div>
+                          <div>
+                            Alertness:{' '}
+                            <span style={{ color: alertnessBarColor(d.alertness), fontWeight: 500 }}>
+                              {d.alertness}
+                            </span>
+                          </div>
+                          {inWindow && (
+                            <div style={{ color: '#868e96', marginTop: 3 }}>In recommended shift</div>
+                          )}
+                        </TooltipBox>
+                      );
+                    }}
+                  />
+                  <ReferenceLine
+                    y={50}
+                    stroke="#adb5bd"
+                    strokeDasharray="4 4"
+                    label={{
+                      value: 'min threshold',
+                      position: 'insideTopRight',
+                      fill: '#adb5bd',
+                      fontSize: 10,
+                      fontFamily: 'Instrument Sans, system-ui, sans-serif',
+                    }}
+                  />
+                  <ReferenceArea
+                    x1={schedule.recommended_shift_start}
+                    x2={schedule.recommended_shift_end - 1}
+                    fill="rgba(44,62,80,0.07)"
+                    stroke="rgba(44,62,80,0.25)"
+                    strokeWidth={1}
+                  />
+                  <Bar dataKey="alertness" isAnimationActive={false} radius={[2, 2, 0, 0]}>
+                    {alertnessData.map((entry) => (
+                      <Cell
+                        key={`cell-${entry.hour}`}
+                        fill={alertnessBarColor(entry.alertness)}
+                        opacity={
+                          entry.hour >= schedule.recommended_shift_start &&
+                          entry.hour < schedule.recommended_shift_end
+                            ? 1
+                            : 0.45
+                        }
+                      />
+                    ))}
+                  </Bar>
+                </ComposedChart>
+              </ResponsiveContainer>
+
+              {/* Part C — Recommendation text */}
+              <div className="rec-text-box">{schedule.recommendation_text}</div>
+
+            </Section>
+          )}
 
           {/* ── Stage legend ─────────────────────────────────────────────── */}
           <div className="stage-legend">
